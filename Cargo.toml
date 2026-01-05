@@ -1,0 +1,12 @@
+[package]
+name = "driftpyrs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "_driftpyrs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.27", features = ["extension-module"] }
+drift-rs = { git = "https://github.com/drift-labs/drift-rs", tag = "v1.0.0-alpha.16" }

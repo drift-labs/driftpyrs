@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "driftpyrs"
+version = "0.1.0"
+description = "Python bindings for drift-rs"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+    "driftpy>=0.8.86",
+    "requests>=2.32.5",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "driftpyrs._driftpyrs"
