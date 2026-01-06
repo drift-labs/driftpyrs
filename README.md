@@ -22,7 +22,38 @@ print(driftpy.get_vault_program_id())
 
 This project uses [maturin](https://github.com/PyO3/maturin) to build the rust code and install it in the python environment, [uv](https://github.com/astral-sh/uv) to manage the python environment, and [cargo](https://github.com/rust-lang/cargo) for the rust code.
 
+### Setup
+
+Before running `uvx maturin develop`, make sure you have:
+
+- Python 3.10+ available on your PATH
+- Rust toolchain installed (via [rustup](https://rustup.rs/))
+- [uv](https://github.com/astral-sh/uv) installed
+
+Install rust dependencies required for the driftrs:
+
+```bash
+rustup install 1.85.0-x86_64-apple-darwin 1.76.0-x86_64-apple-darwin --force-non-host
+rustup override set 1.85.0-x86_64-apple-darwin
+```
+
+Then install the Python dependencies:
+
+```bash
+uv sync
+```
+
 To build the project and install it in the python environment, run:
+
+```bash
+uvx maturin develop
+```
+
+To run examples:
+
+```bash
+uv run python examples/all_functions.py
+```
 
 ```bash
 uvx maturin develop
