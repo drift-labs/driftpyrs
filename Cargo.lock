@@ -1442,6 +1442,7 @@ version = "0.1.0"
 dependencies = [
  "drift-rs",
  "pyo3",
+ "solana-sdk",
 ]
 
 [[package]]
