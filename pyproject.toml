@@ -19,3 +19,6 @@ dependencies = [
 [tool.maturin]
 python-source = "python"
 module-name = "driftpyrs._driftpyrs"
+
+[tool.uv]
+python-preference = "only-managed"
