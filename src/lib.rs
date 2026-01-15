@@ -1,13 +1,43 @@
 use pyo3::prelude::*;
 
 pub mod addresses;
+pub mod async_test;
+pub mod cache_demo;
 pub mod constants;
+pub mod drift_client;
 pub mod math;
 pub mod pyth_lazer;
 pub mod utils;
 
+fn init_observability() {
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        #[cfg(feature = "tokio-console")]
+        {
+            console_subscriber::Builder::default()
+                .with_default_env()
+                .init();
+        }
+
+        #[cfg(all(feature = "observability", not(feature = "tokio-console")))]
+        {
+            let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+            let _ = tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .try_init();
+        }
+    });
+}
+
 #[pymodule]
 fn _driftpyrs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    init_observability();
+    let _ = pyo3_async_runtimes::tokio::get_runtime();
+
     m.add_function(wrap_pyfunction!(constants::get_program_id, m)?)?;
     m.add_function(wrap_pyfunction!(constants::get_vault_program_id, m)?)?;
     m.add_function(wrap_pyfunction!(constants::get_jit_proxy_id, m)?)?;
@@ -41,6 +71,13 @@ fn _driftpyrs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(utils::http_to_ws, m)?)?;
     m.add_function(wrap_pyfunction!(utils::get_ws_url, m)?)?;
     m.add_function(wrap_pyfunction!(utils::get_http_url, m)?)?;
+    m.add_function(wrap_pyfunction!(utils::debug_current_thread, m)?)?;
+    m.add_function(wrap_pyfunction!(utils::build_info, m)?)?;
+
+    m.add_function(wrap_pyfunction!(async_test::sleep_and_return, m)?)?;
+
+    m.add_class::<cache_demo::CacheDemo>()?;
+    m.add_class::<drift_client::DriftClient>()?;
 
     let pyth_lazer = PyModule::new(m.py(), "pyth_lazer")?;
     pyth_lazer.add_function(wrap_pyfunction!(
