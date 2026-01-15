@@ -1,4 +1,6 @@
 from driftpyrs._driftpyrs import (
+    build_info,
+    CacheDemo,
     derive_drift_signer,
     derive_perp_market_account,
     derive_pyth_lazer_oracle,
@@ -9,6 +11,7 @@ from driftpyrs._driftpyrs import (
     derive_stats_account,
     derive_swift_order_account,
     derive_user_account,
+    DriftClient,
     get_associated_token_program_id,
     get_http_url,
     get_jit_proxy_id,
@@ -20,6 +23,7 @@ from driftpyrs._driftpyrs import (
     get_ws_url,
     http_to_ws,
     pyth_lazer,
+    sleep_and_return,
     standardize_base_asset_amount,
     standardize_base_asset_amount_ceil,
     standardize_price,
@@ -52,4 +56,8 @@ __all__ = [
     "get_ws_url",
     "get_http_url",
     "pyth_lazer",
+    "sleep_and_return",
+    "build_info",
+    "CacheDemo",
+    "DriftClient",
 ]
