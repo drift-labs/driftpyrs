@@ -1,4 +1,7 @@
 use pyo3::prelude::*;
+use pythonize::pythonize;
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[pyclass]
@@ -167,53 +170,13 @@ impl DriftClient {
     fn get_perp_market(&self, py: Python<'_>, market_index: u16) -> PyResult<Option<Py<PyAny>>> {
         match self.inner.try_get_perp_market_account(market_index) {
             Ok(market) => {
-                let dict = pyo3::types::PyDict::new(py);
-                dict.set_item("market_index", market.market_index)?;
-                dict.set_item("status", market.status as u8)?;
-                dict.set_item("contract_type", market.contract_type as u8)?;
-                dict.set_item("contract_tier", market.contract_tier as u8)?;
-
-                dict.set_item(
-                    "amm_base_asset_reserve",
-                    market.amm.base_asset_reserve.as_u128(),
-                )?;
-                dict.set_item(
-                    "amm_quote_asset_reserve",
-                    market.amm.quote_asset_reserve.as_u128(),
-                )?;
-                dict.set_item("amm_sqrt_k", market.amm.sqrt_k.as_u128())?;
-                dict.set_item("amm_peg_multiplier", market.amm.peg_multiplier.as_u128())?;
-                dict.set_item(
-                    "amm_cumulative_funding_rate_long",
-                    market.amm.cumulative_funding_rate_long.as_i128(),
-                )?;
-                dict.set_item(
-                    "amm_cumulative_funding_rate_short",
-                    market.amm.cumulative_funding_rate_short.as_i128(),
-                )?;
-                dict.set_item("amm_last_funding_rate", market.amm.last_funding_rate)?;
-                dict.set_item(
-                    "amm_last_funding_rate_long",
-                    market.amm.last_funding_rate_long,
-                )?;
-                dict.set_item(
-                    "amm_last_funding_rate_short",
-                    market.amm.last_funding_rate_short,
-                )?;
-                dict.set_item(
-                    "amm_base_asset_amount_with_amm",
-                    market.amm.base_asset_amount_with_amm.as_i128(),
-                )?;
-
-                dict.set_item(
-                    "number_of_users_with_base",
-                    market.number_of_users_with_base,
-                )?;
-                dict.set_item("number_of_users", market.number_of_users)?;
-                dict.set_item("margin_ratio_initial", market.margin_ratio_initial)?;
-                dict.set_item("margin_ratio_maintenance", market.margin_ratio_maintenance)?;
-
-                Ok(Some(dict.into_any().unbind()))
+                let obj = pythonize(py, &market).map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to serialize perp market: {}",
+                        e
+                    ))
+                })?;
+                Ok(Some(obj.unbind()))
             }
             Err(_) => Ok(None),
         }
@@ -222,38 +185,252 @@ impl DriftClient {
     fn get_spot_market(&self, py: Python<'_>, market_index: u16) -> PyResult<Option<Py<PyAny>>> {
         match self.inner.try_get_spot_market_account(market_index) {
             Ok(market) => {
-                let dict = pyo3::types::PyDict::new(py);
-                dict.set_item("market_index", market.market_index)?;
-                dict.set_item("status", market.status as u8)?;
-                dict.set_item("asset_tier", market.asset_tier as u8)?;
-                dict.set_item(
-                    "name",
-                    String::from_utf8_lossy(&market.name)
-                        .trim_end_matches('\0')
-                        .to_string(),
-                )?;
-                dict.set_item("deposit_balance", market.deposit_balance.as_u128())?;
-                dict.set_item("borrow_balance", market.borrow_balance.as_u128())?;
-                dict.set_item(
-                    "cumulative_deposit_interest",
-                    market.cumulative_deposit_interest.as_u128(),
-                )?;
-                dict.set_item(
-                    "cumulative_borrow_interest",
-                    market.cumulative_borrow_interest.as_u128(),
-                )?;
-                dict.set_item("decimals", market.decimals)?;
-                dict.set_item("initial_asset_weight", market.initial_asset_weight)?;
-                dict.set_item("maintenance_asset_weight", market.maintenance_asset_weight)?;
-                dict.set_item("initial_liability_weight", market.initial_liability_weight)?;
-                dict.set_item(
-                    "maintenance_liability_weight",
-                    market.maintenance_liability_weight,
-                )?;
-
-                Ok(Some(dict.into_any().unbind()))
+                let obj = pythonize(py, &market).map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to serialize spot market: {}",
+                        e
+                    ))
+                })?;
+                Ok(Some(obj.unbind()))
             }
             Err(_) => Ok(None),
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // User Account Queries
+    // -------------------------------------------------------------------------
+
+    /// Get a user account by pubkey (async)
+    fn get_user_account<'py>(
+        &self,
+        py: Python<'py>,
+        account: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let user = inner.get_user_account(&account).await.map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get user account: {}",
+                    e
+                ))
+            })?;
+
+            Python::attach(|py| {
+                pythonize(py, &user)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize user: {}",
+                            e
+                        ))
+                    })
+            })
+        })
+    }
+
+    /// Get user stats by authority pubkey (async)
+    fn get_user_stats<'py>(
+        &self,
+        py: Python<'py>,
+        authority: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let authority = Pubkey::from_str(authority).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let stats = inner.get_user_stats(&authority).await.map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get user stats: {}",
+                    e
+                ))
+            })?;
+
+            Python::attach(|py| {
+                pythonize(py, &stats)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize user stats: {}",
+                            e
+                        ))
+                    })
+            })
+        })
+    }
+
+    /// Get all orders for a user account (async)
+    fn all_orders<'py>(&self, py: Python<'py>, account: &str) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let orders = inner.all_orders(&account).await.map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get orders: {}",
+                    e
+                ))
+            })?;
+
+            Python::attach(|py| {
+                pythonize(py, &orders)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize orders: {}",
+                            e
+                        ))
+                    })
+            })
+        })
+    }
+
+    /// Get all positions (perp and spot) for a user account (async)
+    fn all_positions<'py>(&self, py: Python<'py>, account: &str) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let (perp_positions, spot_positions) =
+                inner.all_positions(&account).await.map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to get positions: {}",
+                        e
+                    ))
+                })?;
+
+            Python::attach(|py| {
+                let dict = pyo3::types::PyDict::new(py);
+                let perp = pythonize(py, &perp_positions).map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to serialize perp positions: {}",
+                        e
+                    ))
+                })?;
+                let spot = pythonize(py, &spot_positions).map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to serialize spot positions: {}",
+                        e
+                    ))
+                })?;
+                dict.set_item("perp", perp)?;
+                dict.set_item("spot", spot)?;
+                Ok(dict.into_any().unbind())
+            })
+        })
+    }
+
+    /// Get unsettled perp positions for a user account (async)
+    fn unsettled_positions<'py>(
+        &self,
+        py: Python<'py>,
+        account: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let positions = inner.unsettled_positions(&account).await.map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get unsettled positions: {}",
+                    e
+                ))
+            })?;
+
+            Python::attach(|py| {
+                pythonize(py, &positions)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize positions: {}",
+                            e
+                        ))
+                    })
+            })
+        })
+    }
+
+    /// Get a specific perp position for a user (async)
+    fn perp_position<'py>(
+        &self,
+        py: Python<'py>,
+        account: &str,
+        market_index: u16,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let position = inner
+                .perp_position(&account, market_index)
+                .await
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to get perp position: {}",
+                        e
+                    ))
+                })?;
+
+            Python::attach(|py| {
+                pythonize(py, &position)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize perp position: {}",
+                            e
+                        ))
+                    })
+            })
+        })
+    }
+
+    /// Get a specific spot position for a user (async)
+    fn spot_position<'py>(
+        &self,
+        py: Python<'py>,
+        account: &str,
+        market_index: u16,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        let account = Pubkey::from_str(account).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid pubkey: {}", e))
+        })?;
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let position = inner
+                .spot_position(&account, market_index)
+                .await
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Failed to get spot position: {}",
+                        e
+                    ))
+                })?;
+
+            Python::attach(|py| {
+                pythonize(py, &position)
+                    .map(|obj| obj.unbind())
+                    .map_err(|e| {
+                        pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Failed to serialize spot position: {}",
+                            e
+                        ))
+                    })
+            })
+        })
     }
 }
