@@ -67,6 +67,15 @@ jobs:
           rustup component add rustfmt
           rustup target add x86_64-apple-darwin
 
+      - name: Install x86_64 OpenSSL
+        run: |
+          # Install x86_64 Homebrew if not present
+          if [[ ! -f /usr/local/bin/brew ]]; then
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          # Install x86_64 OpenSSL
+          arch -x86_64 /usr/local/bin/brew install openssl@3
+
       - name: Download libdrift_ffi_sys
         run: |
           curl -sL -o /tmp/libdrift_ffi_sys.dylib \
