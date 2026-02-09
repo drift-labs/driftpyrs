@@ -36,6 +36,8 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
           before-script-linux: |
+            # Install rustfmt (required by drift-rs build.rs)
+            rustup component add rustfmt
             # Install OpenSSL dev (manylinux2014 is CentOS-based)
             yum install -y openssl-devel
             # Copy FFI lib into the manylinux container
