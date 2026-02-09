@@ -1,5 +1,9 @@
 /target
 
+# Local reference copies (not submodules)
+drift-rs/
+keep-rs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 .pytest_cache/
