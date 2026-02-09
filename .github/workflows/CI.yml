@@ -38,7 +38,7 @@ jobs:
           before-script-linux: |
             # Copy FFI lib into the manylinux container
             mkdir -p /usr/local/lib
-            cp /github/workspace/ffi-lib/libdrift_ffi_sys.so /usr/local/lib/
+            cp "$GITHUB_WORKSPACE/ffi-lib/libdrift_ffi_sys.so" /usr/local/lib/
             ldconfig /usr/local/lib
         env:
           CARGO_DRIFT_FFI_PATH: /usr/local/lib
